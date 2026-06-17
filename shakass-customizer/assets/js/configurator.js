@@ -6,13 +6,16 @@
   const panels = [...root.querySelectorAll('[data-panel]')];
   const toolButtons = [...root.querySelectorAll('[data-tool]')];
   const shirt = root.querySelector('[data-shirt-mockup]');
-  const layersTargets = [root.querySelector('[data-layers]'), root.querySelector('[data-layers-secondary]')].filter(Boolean);
+  const layersTargets = [root.querySelector('[data-layers]')].filter(Boolean);
   const sheet = root.querySelector('[data-mobile-sheet]');
   const sheetContent = root.querySelector('[data-sheet-content]');
 
-  fabric.Object.prototype.cornerColor = '#ff5a2c';
-  fabric.Object.prototype.cornerStrokeColor = '#ffffff';
+  fabric.Object.prototype.cornerColor = '#ffffff';
+  fabric.Object.prototype.cornerStrokeColor = '#ff5a2c';
   fabric.Object.prototype.borderColor = '#ff5a2c';
+  fabric.Object.prototype.cornerStyle = 'circle';
+  fabric.Object.prototype.cornerSize = 9;
+  fabric.Object.prototype.padding = 4;
   fabric.Object.prototype.transparentCorners = false;
 
   const addText = (text, options = {}) => {
@@ -45,7 +48,7 @@
   const renderLayers = () => {
     const objects = canvas.getObjects().slice().reverse();
     layersTargets.forEach(target => {
-      target.innerHTML = objects.map((obj, index) => `<div class="sc-layer"><span>${obj.name || obj.type || 'Élément'}</span><button data-layer-select="${index}">Voir</button><button data-layer-copy="${index}">Dupliquer</button><button data-layer-delete="${index}">×</button></div>`).join('');
+      target.innerHTML = objects.map((obj, index) => `<div class="sc-layer"><span class="sc-layer-icon">${obj.type === 'textbox' ? 'T' : obj.type === 'rect' ? '▦' : '◇'}</span><span>${obj.name || obj.type || 'Élément'}</span><button data-layer-select="${index}">Voir</button><button data-layer-copy="${index}">⧉</button><button data-layer-delete="${index}">×</button></div>`).join('');
     });
   };
 
@@ -61,8 +64,11 @@
     if (button.dataset.closeSheet !== undefined) sheet?.classList.remove('is-open');
     if (button.dataset.pickFile !== undefined) root.querySelector('[data-file-input]')?.click();
     if (button.dataset.side) root.querySelectorAll('[data-side]').forEach(el => el.classList.toggle('is-active', el === button));
+    if (button.dataset.layerSelect) { const obj = canvas.getObjects().slice().reverse()[button.dataset.layerSelect]; if (obj) canvas.setActiveObject(obj).requestRenderAll(); }
     if (button.dataset.layerDelete) { const obj = canvas.getObjects().slice().reverse()[button.dataset.layerDelete]; canvas.remove(obj); renderLayers(); }
-    if (button.dataset.layerCopy) { const obj = canvas.getObjects().slice().reverse()[button.dataset.layerCopy]; obj?.clone(clone => { clone.set({ left: obj.left + 18, top: obj.top + 18, name: `${obj.name || 'Élément'} copie` }); canvas.add(clone); renderLayers(); }); }
+    if (button.dataset.layerCopy) { const obj = canvas.getObjects().slice().reverse()[button.dataset.layerCopy]; obj?.clone(clone => { clone.set({ left: obj.left + 18, top: obj.top + 18, name: `${obj.name || 'Élément'} copie` }); canvas.add(clone).setActiveObject(clone); renderLayers(); }); }
+    if (button.dataset.floatingDelete !== undefined && canvas.getActiveObject()) { canvas.remove(canvas.getActiveObject()); renderLayers(); }
+    if (button.dataset.floatingCopy !== undefined && canvas.getActiveObject()) { const obj = canvas.getActiveObject(); obj.clone(clone => { clone.set({ left: obj.left + 18, top: obj.top + 18, name: `${obj.name || 'Élément'} copie` }); canvas.add(clone).setActiveObject(clone); renderLayers(); }); }
   });
 
   root.addEventListener('change', (event) => {
@@ -88,5 +94,11 @@
     status.textContent = response.ok ? 'Demande prête à être transmise.' : 'Impossible d’envoyer la demande pour le moment.';
   });
 
-  canvas.on('object:added', renderLayers); canvas.on('object:removed', renderLayers); seed();
+  const toolbar = root.querySelector('[data-floating-toolbar]');
+  const syncFloatingToolbar = () => toolbar?.classList.toggle('is-visible', Boolean(canvas.getActiveObject()));
+
+  canvas.on('selection:created', syncFloatingToolbar);
+  canvas.on('selection:updated', syncFloatingToolbar);
+  canvas.on('selection:cleared', syncFloatingToolbar);
+  canvas.on('object:added', renderLayers); canvas.on('object:removed', renderLayers); seed(); syncFloatingToolbar();
 })();
