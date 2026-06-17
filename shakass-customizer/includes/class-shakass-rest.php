@@ -1,48 +1,5 @@
 <?php
-
 declare(strict_types=1);
-
-if (! defined('ABSPATH')) {
-    exit;
-}
-
-final class Shakass_Rest
-{
-    public function register(): void
-    {
-        add_action('rest_api_init', [$this, 'routes']);
-    }
-
-    public function routes(): void
-    {
-        register_rest_route('shakass-customizer/v1', '/request', [
-            'methods' => WP_REST_Server::CREATABLE,
-            'callback' => [$this, 'receiveRequest'],
-            'permission_callback' => static function (WP_REST_Request $request): bool {
-                return wp_verify_nonce((string) $request->get_header('X-WP-Nonce'), 'wp_rest') !== false;
-            },
-            'args' => [
-                'name' => ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field'],
-                'email' => ['type' => 'string', 'sanitize_callback' => 'sanitize_email'],
-                'phone' => ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field'],
-                'quantity' => ['type' => 'integer', 'sanitize_callback' => 'absint'],
-                'message' => ['type' => 'string', 'sanitize_callback' => 'sanitize_textarea_field'],
-                'configuration' => ['type' => 'object'],
-            ],
-        ]);
-    }
-
-    public function receiveRequest(WP_REST_Request $request): WP_REST_Response
-    {
-        $payload = $request->get_params();
-
-        return new WP_REST_Response([
-            'success' => true,
-            'message' => __('Structure de demande reçue. Le stockage complet sera branché dans une prochaine version.', 'shakass-customizer'),
-            'data' => [
-                'reference' => 'SC-' . gmdate('Ymd-His'),
-                'preview' => $payload,
-            ],
-        ], 202);
-    }
-}
+if (! defined('ABSPATH')) { exit; }
+final class Shakass_Rest { public function register(): void { add_action('rest_api_init', [$this,'routes']); } public function routes(): void { register_rest_route('shakass-customizer/v1','/config',['methods'=>WP_REST_Server::READABLE,'callback'=>fn()=>new WP_REST_Response(shakass_config_payload()),'permission_callback'=>'__return_true']); register_rest_route('shakass-customizer/v1','/request',['methods'=>WP_REST_Server::CREATABLE,'callback'=>[$this,'receiveRequest'],'permission_callback'=>fn(WP_REST_Request $r): bool => wp_verify_nonce((string)$r->get_header('X-WP-Nonce'),'wp_rest') !== false]); }
+ public function receiveRequest(WP_REST_Request $request): WP_REST_Response { $p=$request->get_json_params() ?: $request->get_params(); $email=sanitize_email($p['email'] ?? ''); $name=sanitize_text_field($p['name'] ?? ''); if (!$name || !is_email($email)) return new WP_REST_Response(['success'=>false,'message'=>'Nom et email valides obligatoires.'], 400); $data=['name'=>$name,'email'=>$email,'phone'=>sanitize_text_field($p['phone'] ?? ''),'product'=>sanitize_text_field($p['product'] ?? ''),'color'=>sanitize_text_field($p['color'] ?? ''),'size'=>sanitize_text_field($p['size'] ?? ''),'quantity'=>max(1, absint($p['quantity'] ?? 1)),'estimated_price'=>(float)($p['estimated_price'] ?? 0),'message'=>sanitize_textarea_field($p['message'] ?? ''),'configuration'=>wp_json_encode($p['configuration'] ?? []),'preview'=>is_string($p['preview'] ?? '') ? esc_url_raw($p['preview']) : '','created_at'=>current_time('mysql')]; $id=Shakass_Requests::create($data); if (is_wp_error($id)) return new WP_REST_Response(['success'=>false,'message'=>'Impossible de sauvegarder la demande.'], 500); $settings=get_option('shakass_settings', shakass_default_settings()); if (!empty($settings['email'])) { wp_mail($settings['email'], 'Nouvelle demande Shakass Customizer #'.$id, "Une nouvelle demande est disponible dans l'administration.\nClient: {$name}\nEmail: {$email}"); } return new WP_REST_Response(['success'=>true,'message'=>'Demande envoyée et sauvegardée.','id'=>$id,'reference'=>'SC-'.str_pad((string)$id, 5, '0', STR_PAD_LEFT)], 201); } }

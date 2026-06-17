@@ -1,104 +1,19 @@
 (() => {
-  const root = document.querySelector('[data-shakass-customizer]');
-  if (!root) return;
-
-  const canvas = new fabric.Canvas('shakass-canvas', { backgroundColor: 'transparent', preserveObjectStacking: true });
-  const panels = [...root.querySelectorAll('[data-panel]')];
-  const toolButtons = [...root.querySelectorAll('[data-tool]')];
-  const shirt = root.querySelector('[data-shirt-mockup]');
-  const layersTargets = [root.querySelector('[data-layers]')].filter(Boolean);
-  const sheet = root.querySelector('[data-mobile-sheet]');
-  const sheetContent = root.querySelector('[data-sheet-content]');
-
-  fabric.Object.prototype.cornerColor = '#ffffff';
-  fabric.Object.prototype.cornerStrokeColor = '#ff5a2c';
-  fabric.Object.prototype.borderColor = '#ff5a2c';
-  fabric.Object.prototype.cornerStyle = 'circle';
-  fabric.Object.prototype.cornerSize = 9;
-  fabric.Object.prototype.padding = 4;
-  fabric.Object.prototype.transparentCorners = false;
-
-  const addText = (text, options = {}) => {
-    const object = new fabric.Textbox(text || 'Votre texte', {
-      left: 82, top: 110, width: 200, fontSize: Number(root.querySelector('[data-font-size]')?.value || 42),
-      fontFamily: root.querySelector('[data-font]')?.value || 'Montserrat', fill: root.querySelector('[data-text-color]')?.value || '#fff',
-      textAlign: root.querySelector('[data-align]')?.value || 'center', fontWeight: options.bold ? '700' : '600',
-      shadow: options.shadow ? '0 0 14px rgba(255,90,44,.85)' : null, name: text || 'Texte'
-    });
-    canvas.add(object).setActiveObject(object); renderLayers();
-  };
-
-  const seed = () => {
-    addText('SHAKASS', { shadow: true });
-    const sub = new fabric.Textbox('COMMUNICATION', { left: 92, top: 168, width: 180, fontSize: 20, charSpacing: 180, fontFamily: 'Arial', fill: '#ffb199', textAlign: 'center', name: 'Communication' });
-    const crown = new fabric.Text('♛', { left: 155, top: 62, fontSize: 36, fill: '#ff5a2c', name: 'Couronne' });
-    canvas.add(sub, crown); renderLayers();
-  };
-
-  const openTool = (tool) => {
-    panels.forEach(panel => panel.classList.toggle('is-active', panel.dataset.panel === tool));
-    toolButtons.forEach(button => button.classList.toggle('is-active', button.dataset.tool === tool));
-    if (window.matchMedia('(max-width: 1050px)').matches && sheet && sheetContent) {
-      const panel = root.querySelector(`[data-panel="${tool}"]`);
-      sheetContent.innerHTML = panel ? panel.innerHTML : '';
-      sheet.classList.add('is-open');
-    }
-  };
-
-  const renderLayers = () => {
-    const objects = canvas.getObjects().slice().reverse();
-    layersTargets.forEach(target => {
-      target.innerHTML = objects.map((obj, index) => `<div class="sc-layer"><span class="sc-layer-icon">${obj.type === 'textbox' ? 'T' : obj.type === 'rect' ? '▦' : '◇'}</span><span>${obj.name || obj.type || 'Élément'}</span><button data-layer-select="${index}">Voir</button><button data-layer-copy="${index}">⧉</button><button data-layer-delete="${index}">×</button></div>`).join('');
-    });
-  };
-
-  root.addEventListener('click', (event) => {
-    const button = event.target.closest('button');
-    if (!button) return;
-    if (button.dataset.tool) openTool(button.dataset.tool);
-    if (button.dataset.addText !== undefined) addText(root.querySelector('[data-text-input]')?.value || 'SHAKASS');
-    if (button.dataset.applyText !== undefined && canvas.getActiveObject()?.type === 'textbox') canvas.getActiveObject().set('text', root.querySelector('[data-text-input]')?.value || 'Texte') && canvas.requestRenderAll();
-    if (button.dataset.addLogo) { canvas.add(new fabric.Text(button.dataset.addLogo, { left: 145, top: 105, fontSize: 54, fill: '#ff5a2c', name: 'Logo' })); renderLayers(); }
-    if (button.dataset.addQr !== undefined || button.dataset.generateQr !== undefined) { canvas.add(new fabric.Rect({ left: 135, top: 210, width: 86, height: 86, fill: '#fff', name: 'QR Code' })); renderLayers(); }
-    if (button.dataset.openRequest !== undefined) openTool('request');
-    if (button.dataset.closeSheet !== undefined) sheet?.classList.remove('is-open');
-    if (button.dataset.pickFile !== undefined) root.querySelector('[data-file-input]')?.click();
-    if (button.dataset.side) root.querySelectorAll('[data-side]').forEach(el => el.classList.toggle('is-active', el === button));
-    if (button.dataset.layerSelect) { const obj = canvas.getObjects().slice().reverse()[button.dataset.layerSelect]; if (obj) canvas.setActiveObject(obj).requestRenderAll(); }
-    if (button.dataset.layerDelete) { const obj = canvas.getObjects().slice().reverse()[button.dataset.layerDelete]; canvas.remove(obj); renderLayers(); }
-    if (button.dataset.layerCopy) { const obj = canvas.getObjects().slice().reverse()[button.dataset.layerCopy]; obj?.clone(clone => { clone.set({ left: obj.left + 18, top: obj.top + 18, name: `${obj.name || 'Élément'} copie` }); canvas.add(clone).setActiveObject(clone); renderLayers(); }); }
-    if (button.dataset.floatingDelete !== undefined && canvas.getActiveObject()) { canvas.remove(canvas.getActiveObject()); renderLayers(); }
-    if (button.dataset.floatingCopy !== undefined && canvas.getActiveObject()) { const obj = canvas.getActiveObject(); obj.clone(clone => { clone.set({ left: obj.left + 18, top: obj.top + 18, name: `${obj.name || 'Élément'} copie` }); canvas.add(clone).setActiveObject(clone); renderLayers(); }); }
-  });
-
-  root.addEventListener('change', (event) => {
-    const target = event.target;
-    if (target.dataset.summary === 'product') root.querySelector('[data-summary-product]').textContent = target.value;
-    if (target.dataset.summary === 'size') root.querySelector('[data-summary-size]').textContent = target.value;
-    if (target.matches('[data-file-input]') && target.files[0]) root.querySelector('[data-upload-list]').innerHTML += `<span>${target.files[0].name}</span>`;
-  });
-
-  root.querySelectorAll('[data-shirt]').forEach((swatch) => swatch.addEventListener('click', () => {
-    root.querySelectorAll('[data-shirt]').forEach(item => item.classList.remove('is-active'));
-    swatch.classList.add('is-active'); shirt.style.setProperty('--shirt', swatch.dataset.shirt);
-    const name = swatch.getAttribute('aria-label') || 'Couleur';
-    root.querySelector('[data-color-name]').textContent = name; root.querySelector('[data-summary-color]').textContent = name;
-  }));
-
-  root.querySelector('[data-request-form]')?.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const status = root.querySelector('[data-request-status]');
-    status.textContent = 'Préparation de votre demande…';
-    const data = Object.fromEntries(new FormData(event.target).entries());
-    const response = await fetch(ShakassCustomizer.restUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': ShakassCustomizer.nonce }, body: JSON.stringify({ ...data, configuration: canvas.toJSON(['name']) }) });
-    status.textContent = response.ok ? 'Demande prête à être transmise.' : 'Impossible d’envoyer la demande pour le moment.';
-  });
-
-  const toolbar = root.querySelector('[data-floating-toolbar]');
-  const syncFloatingToolbar = () => toolbar?.classList.toggle('is-visible', Boolean(canvas.getActiveObject()));
-
-  canvas.on('selection:created', syncFloatingToolbar);
-  canvas.on('selection:updated', syncFloatingToolbar);
-  canvas.on('selection:cleared', syncFloatingToolbar);
-  canvas.on('object:added', renderLayers); canvas.on('object:removed', renderLayers); seed(); syncFloatingToolbar();
+ const root=document.querySelector('[data-shakass-customizer]'); if(!root||!window.fabric) return; const cfg=window.ShakassCustomizer?.config||{products:[],mockups:[],pricing:{},settings:{}}; const canvas=new fabric.Canvas('shakass-canvas',{backgroundColor:'transparent',preserveObjectStacking:true}); const state={side:'front',front:null,back:null,product:null,color:null,size:null,price:0}; fabric.Object.prototype.cornerColor='#fff'; fabric.Object.prototype.cornerStrokeColor='#ff5a2c'; fabric.Object.prototype.borderColor='#ff5a2c'; fabric.Object.prototype.cornerStyle='circle'; fabric.Object.prototype.transparentCorners=false;
+ const $=s=>root.querySelector(s), $$=s=>[...root.querySelectorAll(s)]; const activeProducts=cfg.products||[]; const pricing=cfg.pricing||{};
+ const setPanel=t=>{$$('[data-panel]').forEach(p=>p.classList.toggle('is-active',p.dataset.panel===t)); $$('[data-tool]').forEach(b=>b.classList.toggle('is-active',b.dataset.tool===t)); if(matchMedia('(max-width:1050px)').matches) $('[data-mobile-sheet]')?.classList.add('is-open')};
+ const productBySlug=s=>activeProducts.find(p=>p.slug===s)||activeProducts[0]; const mockupFor=()=> (cfg.mockups||[]).find(m=>m.product===state.product?.slug && (!state.color||m.color.toLowerCase()===state.color.hex.toLowerCase())) || (cfg.mockups||[]).find(m=>m.product===state.product?.slug) || (cfg.mockups||[])[0];
+ const zone=()=>{const m=mockupFor(), z=(state.side==='back'?m?.back_zone:m?.front_zone)||{x:25,y:24,w:50,h:58}; const el=$('[data-print-zone]'); el.style.left=z.x+'%'; el.style.top=z.y+'%'; el.style.width=z.w+'%'; el.style.height=z.h+'%'; el.style.transform='none';};
+ const saveSide=()=>{state[state.side]=canvas.toJSON(['name']);}; const loadSide=s=>{saveSide(); state.side=s; canvas.loadFromJSON(state[s]||{objects:[]},()=>{canvas.renderAll(); layers();}); $$('[data-side]').forEach(b=>b.classList.toggle('is-active',b.dataset.side===s)); zone();};
+ const price=()=>{const q=Number($('[data-quantity]')?.value||25), base=Number(pricing.base?.[state.product?.slug]||0); let add=0; canvas.getObjects().forEach(o=>{if(o.type==='textbox') add+=Number(pricing.text||0); else if(o.name==='QR Code') add+=Number(pricing.qr||0); else add+=Number(pricing.image||0)}); let discount=q>=50?pricing.discounts?.['50+']:q>=25?pricing.discounts?.['25-49']:q>=10?pricing.discounts?.['10-24']:pricing.discounts?.['1-9']; state.price=((base+add)*q)*(1-Number(discount||0)/100); $('[data-summary-price]').textContent=state.price?state.price.toFixed(2)+' €':'Sur devis';};
+ const summary=()=>{if(!state.product) return; $('[data-summary-product]').textContent=state.product.name; $('[data-summary-meta]').innerHTML=`${state.product.weight||''} · ${state.product.fit||''}`; $('[data-summary-color]').textContent=state.color?.name||''; $('[data-summary-size]').textContent=state.size||''; $('[data-summary-quantity]').textContent=($('[data-quantity]')?.value||1)+' pièces'; $('[data-shirt-mockup]').style.setProperty('--shirt',state.color?.hex||'#08090d'); $('[data-color-name]').textContent=state.color?.name||''; $('[data-product-description]').innerHTML=`<strong>${state.product.type}</strong><span>${state.product.description||''}<br>${state.product.material||''}</span>`; zone(); price();};
+ const fillControls=()=>{const sel=$('[data-product-select]'); sel.innerHTML=activeProducts.map(p=>`<option value="${p.slug}">${p.name}</option>`).join(''); state.product=productBySlug(cfg.settings?.default_product || activeProducts.find(p=>p.default)?.slug); sel.value=state.product.slug; refreshProduct();};
+ const refreshProduct=()=>{state.product=productBySlug($('[data-product-select]').value); const size=$('[data-size-select]'); size.innerHTML=(state.product.sizes||[]).map(s=>`<option>${s}</option>`).join(''); state.size=size.value||state.product.sizes?.[0]; const sw=$('[data-swatches]'); sw.innerHTML=(state.product.colors||[]).map((c,i)=>`<button class="${i?'':'is-active'}" data-color="${c.hex}" data-name="${c.name}" style="background:${c.hex}" aria-label="${c.name}"></button>`).join(''); state.color=state.product.colors?.[0]; summary();};
+ const layers=()=>{const target=$('[data-layers]'); if(!target) return; target.innerHTML=canvas.getObjects().slice().reverse().map((o,i)=>`<div class="sc-layer"><span>${o.type==='textbox'?'T':o.name==='QR Code'?'▦':'◇'}</span><input data-layer-name="${i}" value="${o.name||o.type}"><button data-layer-toggle="${i}">${o.visible===false?'Afficher':'Masquer'}</button><button data-layer-copy="${i}">⧉</button><button data-layer-delete="${i}">×</button></div>`).join(''); price();};
+ const addText=()=>{const o=new fabric.Textbox($('[data-text-input]').value||'Votre texte',{left:80,top:110,width:200,fontSize:Number($('[data-font-size]').value||42),fill:$('[data-text-color]').value||'#fff',fontFamily:'Inter, Arial',textAlign:'center',name:'Texte'}); canvas.add(o).setActiveObject(o); layers();}; const dup=o=>o?.clone(c=>{c.set({left:o.left+18,top:o.top+18,name:(o.name||'Élément')+' copie'}); canvas.add(c).setActiveObject(c); layers();});
+ root.addEventListener('click',e=>{const b=e.target.closest('button'); if(!b) return; if(b.dataset.tool) setPanel(b.dataset.tool); if(b.dataset.closeSheet!==undefined) $('[data-mobile-sheet]')?.classList.remove('is-open'); if(b.dataset.addText!==undefined) addText(); if(b.dataset.applyText!==undefined && canvas.getActiveObject()?.type==='textbox'){canvas.getActiveObject().set({text:$('[data-text-input]').value,fontSize:Number($('[data-font-size]').value),fill:$('[data-text-color]').value}); canvas.renderAll(); layers();} if(b.dataset.deleteActive!==undefined && canvas.getActiveObject()){canvas.remove(canvas.getActiveObject()); layers();} if(b.dataset.duplicateActive!==undefined) dup(canvas.getActiveObject()); if(b.dataset.addLogo){canvas.add(new fabric.Text(b.dataset.addLogo,{left:145,top:105,fontSize:60,fill:'#ff5a2c',name:'Logo'})); layers();} if(b.dataset.addQr!==undefined||b.dataset.generateQr!==undefined){const g=new fabric.Group([new fabric.Rect({width:88,height:88,fill:'#fff'}),new fabric.Text('QR',{left:20,top:28,fontSize:24,fill:'#111'})],{left:135,top:210,name:'QR Code'}); canvas.add(g).setActiveObject(g); layers();} if(b.dataset.pickFile!==undefined) $('[data-file-input]').click(); if(b.dataset.openRequest!==undefined) setPanel('request'); if(b.dataset.side) loadSide(b.dataset.side); const objs=canvas.getObjects().slice().reverse(); if(b.dataset.layerDelete){canvas.remove(objs[b.dataset.layerDelete]); layers();} if(b.dataset.layerCopy) dup(objs[b.dataset.layerCopy]); if(b.dataset.layerToggle){const o=objs[b.dataset.layerToggle]; o.visible=o.visible===false; canvas.renderAll(); layers();}});
+ root.addEventListener('change',e=>{if(e.target.matches('[data-product-select]')) refreshProduct(); if(e.target.matches('[data-size-select]')){state.size=e.target.value; summary();} if(e.target.matches('[data-quantity]')) summary(); if(e.target.matches('[data-file-input]')&&e.target.files[0]){const f=e.target.files[0]; $('[data-upload-list]').innerHTML=`<span>${f.name}</span>`; const r=new FileReader(); r.onload=ev=>fabric.Image.fromURL(ev.target.result,img=>{img.scaleToWidth(180); img.set({left:90,top:120,name:f.name}); canvas.add(img).setActiveObject(img); layers();}); r.readAsDataURL(f);} if(e.target.matches('[data-layer-name]')){const o=canvas.getObjects().slice().reverse()[e.target.dataset.layerName]; if(o) o.name=e.target.value; layers();}});
+ root.addEventListener('click',e=>{const sw=e.target.closest('[data-color]'); if(sw){$$('[data-color]').forEach(x=>x.classList.remove('is-active')); sw.classList.add('is-active'); state.color={name:sw.dataset.name,hex:sw.dataset.color}; summary();}});
+ $('[data-request-form]')?.addEventListener('submit',async e=>{e.preventDefault(); saveSide(); const status=$('[data-request-status]'); status.textContent='Envoi en cours…'; const fd=Object.fromEntries(new FormData(e.target).entries()); const payload={...fd,product:state.product?.name,color:state.color?.name,size:state.size,quantity:$('[data-quantity]').value,estimated_price:state.price,configuration:{front:state.front,back:state.back,current:canvas.toJSON(['name'])},preview:canvas.toDataURL({format:'png',quality:.7})}; const res=await fetch(ShakassCustomizer.requestUrl,{method:'POST',headers:{'Content-Type':'application/json','X-WP-Nonce':ShakassCustomizer.nonce},body:JSON.stringify(payload)}); const json=await res.json().catch(()=>({})); status.textContent=res.ok?`Demande sauvegardée (${json.reference}).`:json.message||'Erreur d’envoi.';});
+ canvas.on('object:modified',layers); canvas.on('object:added',layers); canvas.on('object:removed',layers); fillControls(); addText(); layers();
 })();
